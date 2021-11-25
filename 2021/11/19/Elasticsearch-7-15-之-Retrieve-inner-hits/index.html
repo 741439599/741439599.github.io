@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/%E7%AC%94%E8%AE%B0%E6%9C%AC.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/%E7%AC%94%E8%AE%B0%E6%9C%AC.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":true,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="父-连接和嵌套特性允许返回在不同范围内具有匹配的文档。在父&#x2F;子案例中，父文档是基于子文档中的匹配返回的，或者子文档是基于父文档中的匹配返回的。在嵌套情况下，根据嵌套内部对象中的匹配返回文档。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Elasticsearch 7.15 之 Retrieve inner hits">
+<meta property="og:url" content="http://example.com/2021/11/19/Elasticsearch-7-15-%E4%B9%8B-Retrieve-inner-hits/index.html">
+<meta property="og:site_name" content="龙之旅">
+<meta property="og:description" content="父-连接和嵌套特性允许返回在不同范围内具有匹配的文档。在父&#x2F;子案例中，父文档是基于子文档中的匹配返回的，或者子文档是基于父文档中的匹配返回的。在嵌套情况下，根据嵌套内部对象中的匹配返回文档。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2021-11-19T09:18:23.000Z">
+<meta property="article:modified_time" content="2021-11-22T03:39:10.451Z">
+<meta property="article:author" content="fly dragon">
+<meta property="article:tag" content="Elasticsearch">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2021/11/19/Elasticsearch-7-15-%E4%B9%8B-Retrieve-inner-hits/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Elasticsearch 7.15 之 Retrieve inner hits | 龙之旅</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">龙之旅</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2021/11/19/Elasticsearch-7-15-%E4%B9%8B-Retrieve-inner-hits/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.jpeg">
+      <meta itemprop="name" content="fly dragon">
+      <meta itemprop="description" content="学习之旅">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="龙之旅">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Elasticsearch 7.15 之 Retrieve inner hits
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-11-19 17:18:23" itemprop="dateCreated datePublished" datetime="2021-11-19T17:18:23+08:00">2021-11-19</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2021-11-22 11:39:10" itemprop="dateModified" datetime="2021-11-22T11:39:10+08:00">2021-11-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Elasticsearch/" itemprop="url" rel="index"><span itemprop="name">Elasticsearch</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>父-连接和嵌套特性允许返回在不同范围内具有匹配的文档。在父/子案例中，父文档是基于子文档中的匹配返回的，或者子文档是基于父文档中的匹配返回的。在嵌套情况下，根据嵌套内部对象中的匹配返回文档。</p>
+<span id="more"></span>
+
+<p>在这两种情况下，不同范围中的实际匹配项导致将要返回的文档被隐藏。在许多情况下，了解哪些内部嵌套对象（对于嵌套的情况）或子/父文档（对于父/子的情况）导致某些信息返回非常有用。内部命中功能可用于此目的。此功能在搜索响应中为每个搜索命中返回附加的嵌套命中，这些嵌套命中导致搜索命中匹配在不同范围内。</p>
+<p>可以通过在嵌套的 has_child 或 has_parent 查询和过滤器上定义 inner_hits 定义来使用内部匹配。结构如下：</p>
+<pre><code class="json">&quot;&lt;query&gt;&quot; : &#123;
+  &quot;inner_hits&quot; : &#123;
+    &lt;inner_hits_options&gt;
+  &#125;
+&#125;
+</code></pre>
+<p>如果在支持它的查询上定义了 inner_hits ，则每个搜索命中将包含一个具有以下结构的 inner_hits json 对象：</p>
+<pre><code>&quot;hits&quot;: [
+  &#123;
+    &quot;_index&quot;: ...,
+    &quot;_type&quot;: ...,
+    &quot;_id&quot;: ...,
+    &quot;inner_hits&quot;: &#123;
+      &quot;&lt;inner_hits_name&gt;&quot;: &#123;
+        &quot;hits&quot;: &#123;
+          &quot;total&quot;: ...,
+          &quot;hits&quot;: [
+            &#123;
+              &quot;_type&quot;: ...,
+              &quot;_id&quot;: ...,
+               ...
+            &#125;,
+            ...
+          ]
+        &#125;
+      &#125;
+    &#125;,
+    ...
+  &#125;,
+  ...
+]
+</code></pre>
+<h2 id="Options"><a href="#Options" class="headerlink" title="Options"></a>Options</h2><p>内部命中支持一下选项：</p>
+<table>
+<thead>
+<tr>
+<th align="center">参数</th>
+<th align="center">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">from</td>
+<td align="center">从返回的常规搜索结果中每个 inner_hits 的第一个匹配获取位置开始的偏移量</td>
+</tr>
+<tr>
+<td align="center">size</td>
+<td align="center">每个 inner_hits 返回的最大匹配数。默认情况下，返回前三个匹配项</td>
+</tr>
+<tr>
+<td align="center">sort</td>
+<td align="center">应如何根据 inner_hits 对内部匹配进行排序。默认情况下，命中按得分排序</td>
+</tr>
+<tr>
+<td align="center">name</td>
+<td align="center">响应中用于特定内部匹配定义的名称。在单个搜索请求中定义了多个内部匹配项时很有用。默认值取决于定义内部匹配的查询。对于 has_child 查询和过滤器，这是子类型； has_parent 查询和过滤器，这是父类型；嵌套查询和过滤器，这是嵌套路径。</td>
+</tr>
+</tbody></table>
+<p>内部命中数还支持以下每个文档功能：</p>
+<ul>
+<li>Highlighting</li>
+<li>Explain</li>
+<li>Search fields</li>
+<li>Source filtering</li>
+<li>Script fields</li>
+<li>Doc value fields</li>
+<li>Include versions</li>
+<li>Include Sequence Numbers and Primary Terms</li>
+</ul>
+<h2 id="Nested-inner-hits"><a href="#Nested-inner-hits" class="headerlink" title="Nested inner hits"></a>Nested inner hits</h2><p>嵌套的 inner_hits 可用于包含嵌套的内部对象作为搜索命中的内部命中。</p>
+<pre><code>PUT test
+&#123;
+  &quot;mappings&quot;: &#123;
+    &quot;properties&quot;: &#123;
+      &quot;comments&quot;: &#123;
+        &quot;type&quot;: &quot;nested&quot;
+      &#125;
+    &#125;
+  &#125;
+&#125;
+
+PUT test/_doc/1?refresh
+&#123;
+  &quot;title&quot;: &quot;Test title&quot;,
+  &quot;comments&quot;: [
+    &#123;
+      &quot;author&quot;: &quot;kimchy&quot;,
+      &quot;number&quot;: 1
+    &#125;,
+    &#123;
+      &quot;author&quot;: &quot;nik9000&quot;,
+      &quot;number&quot;: 2
+    &#125;
+  ]
+&#125;
+
+POST test/_search
+&#123;
+  &quot;query&quot;: &#123;
+    &quot;nested&quot;: &#123;
+      &quot;path&quot;: &quot;comments&quot;,
+      &quot;query&quot;: &#123;
+        &quot;match&quot;: &#123; &quot;comments.number&quot;: 2 &#125;
+      &#125;,
+      &quot;inner_hits&quot;: &#123;&#125;    # 嵌套查询中的内部匹配定义。 无需定义其他选项
+    &#125;
+  &#125;
+&#125;
+</code></pre>
+<p>_nested 元数据在上面的示例中至关重要，因为它定义了内部命中来自哪个内部嵌套对象。该字段定义嵌套匹配所来自的对象数组字段以及相对于其在 _source 中的位置的偏移量。由于排序和计分，inner_hits 中命中对象的实际位置通常与嵌套内部对象的位置不同。</p>
+<p>默认情况下，也为 inner_hits 中的命中对象返回 _source ，但是可以更改。通过 _source 过滤功能，可以返回或禁用源的一部分。如果在嵌套级别定义了存储的字段，则也可以通过字段功能返回这些字段。</p>
+<p>一个重要的默认值是，inner_hits 内部的命中返回的 _source 是相对于 _nested 元数据。因此在上面的示例中，每个嵌套的匹配仅返回注释部分，而不返回包含注释的顶级文档的整个源。</p>
+<h2 id="Nested-inner-hits-and-source"><a href="#Nested-inner-hits-and-source" class="headerlink" title="Nested inner hits and _source"></a>Nested inner hits and _source</h2><p>嵌套文档没有 _source 字段，因为整个文档源都与根文档一起存储在 _source 字段下。为了仅包含嵌套文档的源，将分析根文档的源，并且在内部匹配中仅包含嵌套文档的相关位作为源。对每个匹配的嵌套文档执行此操作会影响执行整个搜索请求所需的时间，尤其是在将大小和内部匹配的大小设置为高于默认值时。为避免嵌套内部匹配的源代码提取相对昂贵，可以禁用源代码，而只能依靠文档值字段。像这样：</p>
+<pre><code>PUT test
+&#123;
+  &quot;mappings&quot;: &#123;
+    &quot;properties&quot;: &#123;
+      &quot;comments&quot;: &#123;
+        &quot;type&quot;: &quot;nested&quot;
+      &#125;
+    &#125;
+  &#125;
+&#125;
+
+PUT test/_doc/1?refresh
+&#123;
+  &quot;title&quot;: &quot;Test title&quot;,
+  &quot;comments&quot;: [
+    &#123;
+      &quot;author&quot;: &quot;kimchy&quot;,
+      &quot;text&quot;: &quot;comment text&quot;
+    &#125;,
+    &#123;
+      &quot;author&quot;: &quot;nik9000&quot;,
+      &quot;text&quot;: &quot;words words words&quot;
+    &#125;
+  ]
+&#125;
+
+POST test/_search
+&#123;
+  &quot;query&quot;: &#123;
+    &quot;nested&quot;: &#123;
+      &quot;path&quot;: &quot;comments&quot;,
+      &quot;query&quot;: &#123;
+        &quot;match&quot;: &#123; &quot;comments.text&quot;: &quot;words&quot; &#125;
+      &#125;,
+      &quot;inner_hits&quot;: &#123;
+        &quot;_source&quot;: false,
+        &quot;docvalue_fields&quot;: [
+          &quot;comments.text.keyword&quot;
+        ]
+      &#125;
+    &#125;
+  &#125;
+&#125;
+</code></pre>
+<h2 id="Hierarchical-levels-of-nested-object-fields-and-inner-hits"><a href="#Hierarchical-levels-of-nested-object-fields-and-inner-hits" class="headerlink" title="Hierarchical levels of nested object fields and inner hits"></a>Hierarchical levels of nested object fields and inner hits</h2><p>如果映射具有多层嵌套对象字段的层次，则可以通过点标记路径访问每个层次。 例如，如果有一个 comments 嵌套字段，其中包含一个 votes 嵌套字段，并且投票应直接与根匹配一起返回，则可以定义以下路径：</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          
+          <div class="post-tags">
+              <a href="/tags/Elasticsearch/" rel="tag"><i class="fa fa-tag"></i> Elasticsearch</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/11/19/Elasticsearch-7-15-%E4%B9%8B-Paginate-search-results/" rel="prev" title="Elasticsearch 7.15 之 Paginate search results">
+      <i class="fa fa-chevron-left"></i> Elasticsearch 7.15 之 Paginate search results
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Options"><span class="nav-number">1.</span> <span class="nav-text">Options</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Nested-inner-hits"><span class="nav-number">2.</span> <span class="nav-text">Nested inner hits</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Nested-inner-hits-and-source"><span class="nav-number">3.</span> <span class="nav-text">Nested inner hits and _source</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Hierarchical-levels-of-nested-object-fields-and-inner-hits"><span class="nav-number">4.</span> <span class="nav-text">Hierarchical levels of nested object fields and inner hits</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="fly dragon"
+      src="/images/avatar.jpeg">
+  <p class="site-author-name" itemprop="name">fly dragon</p>
+  <div class="site-description" itemprop="description">学习之旅</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">4</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">1</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+        <span class="site-state-item-count">1</span>
+        <span class="site-state-item-name">标签</span>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">fly dragon</span>
+</div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  
+  <script color='0,0,255' opacity='0.5' zIndex='-1' count='80' src="/lib/canvas-nest/canvas-nest.min.js"></script>
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js"></script>
+  <script src="//cdn.jsdelivr.net/gh/fancyapps/fancybox@3/dist/jquery.fancybox.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
